@@ -152,6 +152,16 @@ void wait_syncpoint(DrmDevice &drm, uint32_t id, uint32_t threshold, uint32_t ti
         throw ioctl_error("Syncpoint wait failed");
 }
 
+void incr_syncpoint(DrmDevice &drm, uint32_t id) {
+    drm_tegra_syncpt_incr syncpt_incr_args;
+    memset(&syncpt_incr_args, 0, sizeof(syncpt_incr_args));
+    syncpt_incr_args.id = id;
+
+    int err = drm.ioctl(DRM_IOCTL_TEGRA_SYNCPT_INCR, &syncpt_incr_args);
+    if (err == -1)
+        throw ioctl_error("Syncpoint increment failed");
+}
+
 SubmitQuirks::SubmitQuirks()
 : force_cmdbuf_words(0)
 , force_cmdbuf_offset(0)

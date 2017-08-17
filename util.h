@@ -76,6 +76,7 @@ public:
 };
 
 void wait_syncpoint(DrmDevice &drm, uint32_t id, uint32_t threshold, uint32_t timeout);
+void incr_syncpoint(DrmDevice &drm, uint32_t id);
 
 std::string read_file(const std::string& path);
 

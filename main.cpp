@@ -76,12 +76,23 @@ void test_submit_timeout(std::string& message) {
         wait_syncpoint(drm, syncpt, result.fence, 100);
     }
     catch (...) {
-        /* Wait for jobs timeout to avoid further tests failures */
-        wait_syncpoint(drm, syncpt, result.fence, DRM_TEGRA_NO_TIMEOUT);
-        return;
+        goto done;
     }
 
     throw std::runtime_error("Syncpoint wait did not timeout");
+
+done:
+    /* Jobs completion needs to be awaited in any case */
+    try {
+        /* Increment stalled syncpoint to speedup jobs completion */
+        incr_syncpoint(drm, syncpt);
+    }
+    catch (...) {
+        message += "Syncpoint increment failed!\n";
+    }
+
+    /* Wait for jobs completion to avoid further tests failures */
+    wait_syncpoint(drm, syncpt, result.fence, DRM_TEGRA_NO_TIMEOUT);
 }
 
 void test_invalid_cmdbuf(std::string& message) {
