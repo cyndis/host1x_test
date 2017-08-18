@@ -47,6 +47,7 @@ public:
 
     uint32_t incrementSyncpointOp(uint32_t syncpoint) const;
     uint32_t defaultClass() const;
+    bool hasGatherFilter() const;
 
 private:
     Soc _soc;

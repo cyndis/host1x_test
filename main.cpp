@@ -315,6 +315,34 @@ void test_submit_performance(std::string& message) {
         write_file(path, governor);
 }
 
+void test_gather_filter(std::string& message) {
+    DrmDevice drm;
+    Channel ch(drm);
+
+    uint32_t syncpt = ch.syncpoint(0);
+
+    Submit submit;
+    submit.push(host1x_opcode_setclass(HOST1X_CLASS_HOST1X, 0, 0));
+    submit.push(host1x_opcode_nonincr(0, 0));
+    submit.push(host1x_opcode_nonincr(0, 1));
+    submit.push(platform.incrementSyncpointOp(syncpt));
+
+    submit.add_incr(syncpt, 1);
+
+    auto result = submit.submit(ch);
+
+    try {
+        wait_syncpoint(drm, syncpt, result.fence, 100);
+    }
+    catch (...) {
+        /* Wait for jobs timeout to avoid further tests failures */
+        wait_syncpoint(drm, syncpt, result.fence, DRM_TEGRA_NO_TIMEOUT);
+        return;
+    }
+
+    throw std::runtime_error("Job with SETCL opcode succeeded");
+}
+
 int main(int argc, char **argv) {
     fprintf(stderr, "host1x_test - Linux host1x driver test suite\n");
 
@@ -359,6 +387,8 @@ int main(int argc, char **argv) {
     PUSH_TEST(test_invalid_cmdbuf);
     PUSH_TEST(test_invalid_reloc);
     PUSH_TEST(test_submit_performance);
+    if (platform.hasGatherFilter())
+        PUSH_TEST(test_gather_filter);
 
     for (const auto &test : tests) {
         fprintf(stderr, "- %-40s ", test.name);

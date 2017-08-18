@@ -100,3 +100,8 @@ uint32_t Platform::defaultClass() const
         return HOST1X_CLASS_VIC;
     }
 }
+
+bool Platform::hasGatherFilter() const
+{
+    return (_soc >= Tegra124);
+}
