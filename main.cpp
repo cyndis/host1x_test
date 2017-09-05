@@ -370,12 +370,16 @@ int main(int argc, char **argv) {
     PUSH_TEST(test_invalid_reloc);
     PUSH_TEST(test_submit_performance);
 
+    unsigned int total = 0, passed = 0;
+
     for (const auto &test : tests) {
+        total++;
         fprintf(stderr, "- %-40s ", test.name);
         try {
             std::string message;
             (test.func)(message);
             fprintf(stderr, "PASSED\n%s", message.c_str());
+            passed++;
         }
         catch (ioctl_error e) {
             fprintf(stderr, "FAILED\n");
@@ -387,6 +391,12 @@ int main(int argc, char **argv) {
             fprintf(stderr, "  Reason: %s\n", e.what());
         }
     }
+
+    fprintf(stderr, "\n");
+    fprintf(stderr, "%-42s %d\n", "Tests ran", total);
+    fprintf(stderr, "%-42s %d\n", "Tests passed", passed);
+    fprintf(stderr, "\n%-42s %s\n", "Conclusion",
+            passed == total ? "PASSED" : "FAILED");
 
     return 0;
 }
