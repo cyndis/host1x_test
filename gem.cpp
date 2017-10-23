@@ -56,6 +56,11 @@ GemBuffer::GemBuffer(DrmDevice &dev)
 {
 }
 
+GemBuffer::GemBuffer(const GemBuffer &gem)
+: _dev(gem._dev), _valid(false), _handle(0), _map(nullptr)
+{
+}
+
 GemBuffer::~GemBuffer()
 {
     if (_map) {

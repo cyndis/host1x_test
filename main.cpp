@@ -219,17 +219,16 @@ float submit_performance_test(std::string& message, unsigned num_batches,
     uint32_t syncpt = ch.syncpoint(0);
     unsigned i = 0, k;
 
-    std::vector<GemBuffer*> relocs(num_relocs);
+    std::vector<GemBuffer> relocs;
 
-    for (auto &bo : relocs) {
-        bo = new GemBuffer(drm);
-
-        if (bo->allocate(4096))
-            throw std::runtime_error("Allocation failed");
-    }
+    for (k = 0; k < num_relocs; k++)
+        relocs.emplace_back(drm);
 
     Submit submit;
     for (auto &bo : relocs) {
+        if (bo.allocate(4096))
+            throw std::runtime_error("Allocation failed");
+
         submit.push(host1x_opcode_nonincr(0x2b, 1));
         submit.push(0xdeadbeef);
     }
@@ -239,7 +238,7 @@ float submit_performance_test(std::string& message, unsigned num_batches,
     submit.add_incr(syncpt, 1);
 
     for (auto &bo : relocs)
-        submit.add_reloc(i++ * 8 + 4, bo->handle(), 0, 0);
+        submit.add_reloc(i++ * 8 + 4, bo.handle(), 0, 0);
 
     clock_t clocks = 0;
 
@@ -253,9 +252,6 @@ float submit_performance_test(std::string& message, unsigned num_batches,
         clocks += clock() - begin;
         wait_syncpoint(drm, syncpt, result.fence, DRM_TEGRA_NO_TIMEOUT);
     }
-
-    for (auto &bo : relocs)
-        delete bo;
 
     char buffer[256];
     float elapsed = double(clocks) / CLOCKS_PER_SEC;
