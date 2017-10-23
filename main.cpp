@@ -220,25 +220,39 @@ float submit_performance_test(std::string& message, unsigned num_batches,
     unsigned i = 0, k;
 
     std::vector<GemBuffer> relocs;
+    std::vector<GemBuffer> cmdbufs;
 
-    for (k = 0; k < num_relocs; k++)
+    Submit::prepared_desc submit_descs[num_submits];
+
+    for (i = 0; i < num_relocs; i++)
         relocs.emplace_back(drm);
 
+    for (i = 0; i < num_submits; i++)
+        cmdbufs.emplace_back(drm);
+
+    uint32_t reloc_offset = 4;
     Submit submit;
     for (auto &bo : relocs) {
         if (bo.allocate(4096))
             throw std::runtime_error("Allocation failed");
 
+        submit.add_reloc(reloc_offset, bo.handle(), 0, 0);
         submit.push(host1x_opcode_nonincr(0x2b, 1));
         submit.push(0xdeadbeef);
+
+        reloc_offset += 8;
     }
     submit.push(host1x_opcode_nonincr(0, 1));
     submit.push(platform.incrementSyncpointOp(syncpt));
 
     submit.add_incr(syncpt, 1);
 
-    for (auto &bo : relocs)
-        submit.add_reloc(i++ * 8 + 4, bo.handle(), 0, 0);
+    for (auto &bo : cmdbufs)
+        if (bo.allocate(4096))
+            throw std::runtime_error("Allocation failed");
+
+    for (i = 0; i < num_submits; i++)
+        submit_descs[i] = submit.prepare(ch, cmdbufs[i]);
 
     clock_t clocks = 0;
 
@@ -247,7 +261,7 @@ float submit_performance_test(std::string& message, unsigned num_batches,
         clock_t begin = clock();
 
         for (k = 0; k < num_submits; k++)
-            result = submit.submit(ch);
+            result = submit.submit(ch, submit_descs[k]);
 
         clocks += clock() - begin;
         wait_syncpoint(drm, syncpt, result.fence, DRM_TEGRA_NO_TIMEOUT);
