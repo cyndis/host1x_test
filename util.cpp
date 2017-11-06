@@ -103,12 +103,12 @@ void Submit::add_reloc(uint32_t cmdbuf_offset, uint32_t target,
     _relocs.push_back(reloc);
 }
 
-drm_tegra_submit Submit::submit(Channel &ch) {
-    GemBuffer cmdbuf_bo(ch._drm);
-    if (cmdbuf_bo.allocate(_cmdbuf.size() * sizeof(uint32_t)))
-        throw ioctl_error("Cmdbuf GEM allocation failed");
+Submit::prepared_desc Submit::prepare(Channel &ch, GemBuffer &cmdbuf_bo) {
+    prepared_desc prep_desc;
+    prep_desc.relocs = _relocs;
+    prep_desc.incrs = _incrs;
 
-    for (auto &reloc : _relocs)
+    for (auto &reloc : prep_desc.relocs)
         reloc.cmdbuf.handle = cmdbuf_bo.handle();
 
     void *cmdbuf_ptr = cmdbuf_bo.map();
@@ -122,15 +122,21 @@ drm_tegra_submit Submit::submit(Channel &ch) {
     cmdbuf_desc.offset = quirks.force_cmdbuf_offset ?: 0;
     cmdbuf_desc.words = quirks.force_cmdbuf_words ?: _cmdbuf.size();
 
+    prep_desc.cmdbufs.push_back(cmdbuf_desc);
+
+    return prep_desc;
+}
+
+drm_tegra_submit Submit::submit(Channel &ch, prepared_desc &prep_desc) {
     drm_tegra_submit submit_desc;
     memset(&submit_desc, 0, sizeof(submit_desc));
     submit_desc.context = ch._context;
-    submit_desc.num_syncpts = _incrs.size();
-    submit_desc.num_cmdbufs = 1;
-    submit_desc.num_relocs = _relocs.size();
-    submit_desc.syncpts = (uintptr_t)&_incrs[0];
-    submit_desc.cmdbufs = (uintptr_t)&cmdbuf_desc;
-    submit_desc.relocs = (uintptr_t)&_relocs[0];
+    submit_desc.num_syncpts = prep_desc.incrs.size();
+    submit_desc.num_cmdbufs = prep_desc.cmdbufs.size();
+    submit_desc.num_relocs = prep_desc.relocs.size();
+    submit_desc.syncpts = (uintptr_t)&prep_desc.incrs[0];
+    submit_desc.cmdbufs = (uintptr_t)&prep_desc.cmdbufs[0];
+    submit_desc.relocs = (uintptr_t)&prep_desc.relocs[0];
     submit_desc.timeout = 2000;
 
     int err = ch._drm.ioctl(DRM_IOCTL_TEGRA_SUBMIT, &submit_desc);
@@ -138,6 +144,16 @@ drm_tegra_submit Submit::submit(Channel &ch) {
         throw ioctl_error("Submit failed");
 
     return submit_desc;
+}
+
+drm_tegra_submit Submit::submit(Channel &ch) {
+    GemBuffer cmdbuf_bo(ch._drm);
+    if (cmdbuf_bo.allocate(_cmdbuf.size() * sizeof(uint32_t)))
+        throw ioctl_error("Cmdbuf GEM allocation failed");
+
+    prepared_desc desc = prepare(ch, cmdbuf_bo);
+
+    return submit(ch, desc);
 }
 
 void wait_syncpoint(DrmDevice &drm, uint32_t id, uint32_t threshold, uint32_t timeout) {

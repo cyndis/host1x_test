@@ -46,7 +46,7 @@ typedef uint32_t gem_handle;
 class GemBuffer {
 public:
     GemBuffer(DrmDevice &dev);
-    GemBuffer(const GemBuffer &) = delete;
+    GemBuffer(const GemBuffer &);
     ~GemBuffer();
 
     int allocate(size_t bytes);
